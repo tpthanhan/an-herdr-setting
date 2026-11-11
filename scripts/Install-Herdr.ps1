@@ -7,11 +7,11 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $source = Join-Path (Split-Path $PSScriptRoot -Parent) 'herdr'
-$items = @('mods/space-agents-tree', 'mods/skillshare', 'layouts/herdr-skillshare.json', 'layouts/herdr-skillshare.png')
+$items = @('mods/space-agents-tree', 'mods/pi-image-paste', 'layouts/herdr-skillshare.json')
 if ($ApplySettings) { $items += 'settings.json' }
 $app = Get-Command herdr-app -ErrorAction Stop
 # Validate before touching the destination. Check does not run later async UI states.
-foreach ($mod in @('space-agents-tree', 'skillshare')) {
+foreach ($mod in @('space-agents-tree', 'pi-image-paste')) {
     # Herdr is a Windows GUI executable; PowerShell needs an explicit wait for its exit code.
     $checked = Start-Process -FilePath $app.Source -ArgumentList @('check', ('"{0}"' -f (Join-Path $source "mods/$mod"))) -NoNewWindow -Wait -PassThru
     if ($checked.ExitCode -ne 0) { throw "Mod validation failed: $mod" }
@@ -42,9 +42,10 @@ foreach ($item in $items) {
         }
     } else { Copy-Item -LiteralPath $from -Destination $target -Force }
 }
+& (Join-Path $PSScriptRoot 'Install-PasteKeys.ps1') -HerdrHome $HerdrHome -WhatIf:$WhatIfPreference
 if ($Activate -and $PSCmdlet.ShouldProcess('Herdr', 'Switch to herdr-skillshare layout')) {
     $switched = Start-Process -FilePath $app.Source -ArgumentList @('do', 'layout.switch', '--name', 'herdr-skillshare') -NoNewWindow -Wait -PassThru
     if ($switched.ExitCode -ne 0) { throw 'Layout activation failed. Start Herdr and switch to herdr-skillshare.' }
 }
 if ($collisions.Count) { Write-Host "Existing items backed up to $backup (unless -WhatIf)." }
-Write-Host 'Keys and machine/session state were not changed.'
+Write-Host 'Paste shortcuts merged; unrelated keys and machine/session state were not changed.'

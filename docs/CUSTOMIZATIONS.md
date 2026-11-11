@@ -2,7 +2,7 @@
 
 ## Layout and agent tree
 
-`herdr/layouts/herdr-skillshare.json` is the active personal layout exported here. It uses `space-agents-tree` for the Spaces block and hides the separate Agents block. Other layout elements, including the Skillshare panel, remain intact.
+`herdr/layouts/herdr-skillshare.json` is the personal layout exported here. It uses `space-agents-tree` for the Spaces block and hides the separate Agents block. The Skillshare panel, toggle, mod and original preview are excluded. The layout name stays unchanged for compatibility with installed layouts and paste shortcuts. All other layout elements remain intact. Export strips those Skillshare elements from its copy without changing the live setup.
 
 `space-agents-tree` was cloned through `herdr-app do mod.clone --name spaces --as space-agents-tree`. The clone metadata records Herdr 0.1.15. It retains the original space menus, worktree grouping, machine grouping and compact rail. Added behavior:
 
@@ -37,4 +37,10 @@ Herdr mods cannot embed a webview through the current public mod API. The propos
 - Herdr-generated API declarations and `jsconfig.json`.
 - Shipped layouts/mods (except the explicitly modified Spaces clone).
 - Unrelated pre-existing T3/Code layouts and mods.
-- `keys.json`: no keybindings were changed in this customization work; the live file also includes unrelated T3 bindings.
+- Full `keys.json`: unrelated personal bindings are not exported. `scripts/Install-PasteKeys.ps1` merges only Ctrl+V / Ctrl+Shift+V: native defaults move from `terminal` to `global`, allowing `layout:herdr-skillshare` to override them with `pi-image-paste.paste`. Other layouts keep native paste. Existing non-default bindings are refused, not overwritten.
+
+## Windows clipboard images
+
+`pi-image-paste` is a personal mod mounted as a zero-width layout block. It saves clipboard images as uniquely named PNGs under `%TEMP%/herdr-pi-images/`, pastes a quoted forward-slash path with a trailing space, and does not press Enter. Pi can read that path when requested. It uses external Windows PowerShell and reads/writes the system clipboard; the original image is restored after paste unless the clipboard changed meanwhile (other rich formats are not restored). Images remain in temp for later reads, with no network access or automatic cleanup. Non-image clipboard contents and remote terminals use native paste. Changing focus during the save cancels insertion rather than pasting into another terminal.
+
+Validation: the mod passes `herdr-app check` and the running app reports no errors. An interactive clipboard-image paste into Pi still needs manual verification.

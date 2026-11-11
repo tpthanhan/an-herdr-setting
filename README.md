@@ -4,20 +4,19 @@ Portable Herdr customizations, exported from the working setup. This repository 
 
 ## Included
 
-- **Herdr + Skillshare layout:** the standard sidebar/work area with a Skillshare toggle and panel.
+- **Personal Herdr layout:** the standard sidebar/work area without the Skillshare panel or toggle.
 - **Spaces/agents tree:** agents nested beneath their spaces, with live status indicators and click-to-focus. Space chevrons expand/collapse agent lists; sub-agents nest under their parent when available. The separate Agents section is hidden in this layout. Narrow sidebar mode keeps the original space rail.
+- **Windows image paste:** Ctrl+V / Ctrl+Shift+V in the personal layout save clipboard images to temporary PNGs and paste quoted paths without submitting. Ordinary text/file paste stays native; other layouts retain native paste shortcuts.
 - **Personal look/preferences:** dark appearance, zoom 1, sounds disabled, minimum contrast 1. Applying these preferences is optional.
-- **Upstream layout preview:** the original Skillshare image; it does not depict the added agent tree.
 
 ```text
 herdr/
   settings.json
   layouts/
     herdr-skillshare.json
-    herdr-skillshare.png
   mods/
     space-agents-tree/
-    skillshare/
+    pi-image-paste/
 scripts/
   Export-Herdr.ps1
   Install-Herdr.ps1
@@ -43,15 +42,15 @@ From PowerShell in this repository:
 .\scripts\Install-Herdr.ps1 -Overwrite -ApplySettings -Activate
 ```
 
-`-Overwrite` copies existing affected items into a timestamped `backups/setting-*` folder inside the Herdr home before replacing files. Other layouts, mods and keybindings are untouched. Use `-WhatIf` to preview file changes (mod validation still runs). `-HerdrHome <path>` selects the file destination; to activate a non-default running window, set `HERDR_APP_HOME` to that same path first. The scripts otherwise honor `HERDR_APP_HOME`, falling back to `~/.config/herdr-app`.
+`-Overwrite` copies existing affected items into a timestamped `backups/setting-*` folder inside the Herdr home before replacing files. Unrelated layouts, mods and keybindings are untouched. The installer merges the image-paste shortcuts using `scripts/Install-PasteKeys.ps1`, backs up `keys.json`, and refuses conflicting custom paste bindings. Use `-WhatIf` to preview file changes (mod validation still runs). `-HerdrHome <path>` selects the file destination; to activate a non-default running window, set `HERDR_APP_HOME` to that same path first. The scripts otherwise honor `HERDR_APP_HOME`, falling back to `~/.config/herdr-app`.
 
 To return to another layout, use **Ctrl+Shift+L**. Herdr's emergency reset is **Ctrl+Alt+Shift+Escape**.
 
-## Skillshare prerequisites and permissions
+## Image paste prerequisites and permissions
 
-The Skillshare mod runs external programs, including `skillshare`, `git`, `sh` and POSIX shell helpers. It can clone user-supplied install URLs, update/sync resources and read its temporary job files. Audit hand-off uses `hc send`. Review its code before installing.
+Windows only: uses Windows PowerShell (`powershell.exe -STA`), Windows Forms clipboard access and System.Drawing. It reads clipboard images, writes unique PNGs under `%TEMP%/herdr-pi-images/`, temporarily puts the quoted path on the clipboard for Herdr's native paste, then restores the image if the clipboard still contains that path. Rich clipboard formats are not preserved. Files remain available for Pi's read tool until you or Windows clean up the temp folder; images are not uploaded or automatically submitted. Switching terminal focus while saving cancels the paste. Remote terminals retain native Herdr paste behavior.
 
-**Known Windows limitation:** the current setup previously reported `cannot run sh: program not found`, and `skillshare` was not on the shell PATH at that time. A passing Herdr mod check verifies initial rendering, not those external dependencies. Install/configure compatible tools for Herdr's process environment before relying on the panel. This repo does not install them or rewrite PATH.
+The mod is a zero-width service block in `herdr-skillshare`; other layouts do not depend on it. Plain text and copied files fall back to native paste. No Pi extension or shared library changes are needed.
 
 ## Refresh this export
 
@@ -61,6 +60,8 @@ After changing the live layout/mods/preferences:
 .\scripts\Export-Herdr.ps1
 git diff
 ```
+
+The existing `herdr-skillshare` layout name is retained only for compatibility with installed layouts and paste shortcuts; Skillshare is not included. The exporter removes the Skillshare toggle, panel and original preview reference from the exported layout even if they remain in the live setup. Export does not modify that live setup.
 
 The exporter uses an allowlist and omits generated declarations, session state and unrelated layouts/mods. It copies current files, but does not delete obsolete files in the repository; review deletions manually. Always inspect the diff for personal paths or secrets before publishing. Avoid committing screenshots of your live terminal.
 
@@ -86,7 +87,7 @@ git push -u origin main
 
 ```powershell
 herdr-app check ./herdr/mods/space-agents-tree
-herdr-app check ./herdr/mods/skillshare
+herdr-app check ./herdr/mods/pi-image-paste
 ```
 
-Both mods passed checks on the source machine. The agent tree was also confirmed rendered in the running app with no reported errors. Full installation on a second machine and reboot restoration have not been tested.
+Both retained mods passed checks on the source machine. Export from a fixture containing the live layout and installation into an isolated temporary Herdr home were verified: Skillshare stays excluded, retained settings/mod files remain unchanged, and paste shortcuts are installed. The live setup was not modified. The agent tree was previously confirmed rendered in the running app with no reported errors. Full installation on a second machine and reboot restoration have not been tested.

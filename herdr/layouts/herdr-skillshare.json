@@ -4,7 +4,6 @@
     "name": "main",
     "version": "0.1.12"
   },
-  "preview": "layouts/herdr-skillshare.png",
   "type": "row",
   "titlebar": "none",
   "traffic_lights": [
@@ -21,6 +20,14 @@
     "color": "border"
   },
   "children": [
+    {
+      "id": "pi-image-paste",
+      "type": "block",
+      "size": { "px": 0 },
+      "content": {
+        "mod": "pi-image-paste"
+      }
+    },
     {
       "id": "sidebar",
       "type": "column",
@@ -110,19 +117,6 @@
               "content": {
                 "mod": "tabs"
               }
-            },
-            {
-              "id": "skillshare-toggle",
-              "type": "block",
-              "content": {
-                "mod": "skillshare",
-                "props": {
-                  "role": "toggle"
-                }
-              },
-              "size": {
-                "px": 118
-              }
             }
           ]
         },
@@ -191,24 +185,6 @@
                       }
                     }
                   ]
-                }
-              ]
-            },
-            {
-              "id": "skillshare-panel",
-              "type": "column",
-              "size": {
-                "px": 400
-              },
-              "min": 320,
-              "max": 720,
-              "children": [
-                {
-                  "id": "skillshare",
-                  "type": "block",
-                  "content": {
-                    "mod": "skillshare"
-                  }
                 }
               ]
             }
