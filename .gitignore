@@ -1,0 +1,23 @@
+# Herdr-generated development files
+**/gpui-kit.d.ts
+**/herdr.d.ts
+**/jsconfig.json
+**/*.error
+**/node_modules/
+
+# Machine/session data must never be published
+**/view.json
+**/shared.json*
+**/seen.json
+**/installed.json
+**/window.json
+**/windows.json
+**/layouts/.state/
+**/data/
+**/telemetry/
+**/backups/
+*.log
+.env
+.env.*
+.DS_Store
+Thumbs.db
