@@ -15,6 +15,16 @@
 
 The mod inherits the shipped Spaces mod's Git reads, repository watching and machine commands. It is not a passive theme. Personal clones do not receive future upstream changes automatically.
 
+## Existing worktree discovery
+
+The Spaces clone previously grouped only checkouts that already had Herdr spaces. It now also asks Git for existing linked checkouts (`git worktree list --porcelain -z`) and draws unopened ones beneath a representative space, preferring the main checkout. `worktrees.js` parses Git's NUL-delimited records and matches normalized paths, including a terminal inside a checkout's subdirectory. A nested checkout takes precedence over its enclosing checkout. Matching is machine-scoped; remote Unix paths remain case-sensitive, Windows drive/UNC paths are compared case-insensitively.
+
+These are discovery rows, not automatically created spaces. Click Open to start a space in the existing folder. Already-open checkouts are omitted, and the click handler rechecks before opening. Short duplicate-click protection avoids launching two spaces from a double-click. The space fold also hides discovered rows. Actual open worktree spaces keep the inherited grouping behavior.
+
+The snapshot refreshes with the existing Git watcher/terminal-transition refresh and 60-second active-window fallback. Remote discovery uses `exec` on that space's machine. No global filesystem scan, Git worktree creation, automatic agent launch or Git worktree deletion is performed. Prunable registrations are omitted; discovery errors are shown in the tree. Main/linked classification compares the absolute Git directory against the common Git directory rather than assuming every primary checkout has a `.git` directory (submodules and separate Git dirs can differ).
+
+Regression tests: `node --test tests/worktrees.test.mjs` (Node.js and Git only). Herdr mod checks are still required for the native UI.
+
 ## Keep terminals on restart
 
 Keep was explicitly ensured for the three terminals present during configuration. Those terminal addresses are deliberately not distributed: they are machine-specific. No invented `settings.json` restore flag is needed or included.

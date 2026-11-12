@@ -6,6 +6,7 @@ Portable Herdr customizations, exported from the working setup. This repository 
 
 - **Personal Herdr layout:** the standard sidebar/work area without the Skillshare panel or toggle.
 - **Spaces/agents tree:** agents nested beneath their spaces, with live status indicators and click-to-focus. Space chevrons expand/collapse agent lists; sub-agents nest under their parent when available. The separate Agents section is hidden in this layout. Narrow sidebar mode keeps the original space rail.
+- **Existing worktree discovery:** Git worktrees of repos represented in the sidebar appear automatically as indented Open rows, including worktrees made outside Herdr. Click to open a space; discovery itself does not launch terminals. Already-open checkouts are not duplicated.
 - **Windows image paste:** Ctrl+V / Ctrl+Shift+V in the personal layout save clipboard images to temporary PNGs and paste quoted paths without submitting. Ordinary text/file paste stays native; other layouts retain native paste shortcuts.
 - **Personal look/preferences:** dark appearance, zoom 1, sounds disabled, minimum contrast 1. Applying these preferences is optional.
 
@@ -83,7 +84,22 @@ git remote add origin https://github.com/YOUR-USER/YOUR-REPO.git
 git push -u origin main
 ```
 
+## Worktree discovery
+
+The sidebar reads `git worktree list --porcelain -z` for repositories represented by a space's first terminal (or saved folder). Worktrees can live anywhere; no `~/.herdr/worktrees` convention is required. Unopened linked checkouts are shown once per repository and machine. Branch names label the rows; detached checkouts show a short commit. Hover for the full path. The main checkout and stale/prunable registrations are not proposed as child rows; locked worktrees remain available.
+
+Discovery refreshes at startup, on repository Git-folder changes where supported, after relevant terminal work ends, and on a 60-second fallback while the window is active and the machine group is expanded. Repositories not represented by any space are not scanned. Clicking an Open row creates a normal space in that checkout, or selects it if it was opened meanwhile. It does not create/remove Git worktrees or run agents.
+
 ## Validation
+
+The worktree tests require Node.js and Git, with no npm dependencies:
+
+```powershell
+node --test tests/worktrees.test.mjs
+```
+
+Tests cover NUL-delimited paths, detached/locked/prunable and bare records, Windows path matching, machine isolation, duplicate prevention, click actions and a real Git worktree created before discovery, including removal refresh.
+
 
 ```powershell
 herdr-app check ./herdr/mods/space-agents-tree

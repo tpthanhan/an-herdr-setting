@@ -1,11 +1,13 @@
 // Workspace spaces: stable colored avatars, worktrees under their checkout,
 // grouped by machine when more than one is known. After a space's name, the repo
-// its first terminal is in now, only where unusual: branch, ahead/behind. Agent state lives in the agents list, not here. Click to
-// switch, right-click for its menu, drag to reorder.
+// its first terminal is in now, only where unusual: branch, ahead/behind.
+// Agents and unopened Git worktrees nest below spaces. Click to switch,
+// right-click for its menu, drag to reorder.
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { spaces, machines, panes, agents, terminals, setAgentOrder, run, openOverlay, exec, hc, theme, shared, setShared, watchFolder, window, layout } from "herdr";
+import { parseWorktrees, pathKey, checkoutForFolder, unopenedWorktrees } from "./worktrees.js";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -50,6 +52,8 @@ export function tone(t, status) {
 export default class Spaces extends View {
   init(_props, cx) {
     this.git = {}; // where() -> { name, branch, ahead, behind, repo, linked }, null: not a repo
+    this.worktrees = new Map(); // machine-qualified common git dir -> discovered checkouts
+    this.openingWorktrees = new Set();
     this.checked = {}; // where() -> when it was last looked at
     this.unsure = new Set(); // where()s git couldn't answer for (a machine away)
     this.pending = new Set(); // where()s to look at next
@@ -201,27 +205,31 @@ export default class Spaces extends View {
     this.unsure.delete(key);
     try {
       // Ref-only reads avoid scanning the worktree or waking its index watch.
-      // Two reads: a folder name may itself contain a newline.
-      const [r, common] = await Promise.all([
+      // Separate reads: a folder name may itself contain a newline.
+      const [r, common, gitDir] = await Promise.all([
         exec("git", ["rev-parse", "--path-format=absolute", "--show-toplevel"], { cwd, on }),
         exec("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd, on }),
+        exec("git", ["rev-parse", "--absolute-git-dir"], { cwd, on }),
       ]);
-      if (r.code !== 0 || common.code !== 0) {
+      if (r.code !== 0 || common.code !== 0 || gitDir.code !== 0) {
         // Only git's own "no" is remembered as no repo; anything else is asked again.
         if (!/not a git repository/i.test(r.code !== 0 ? r.stderr : common.stderr)) this.unsure.add(key);
         this.git[key] = null;
         return;
       }
       // The repo's own .git folder names it; a worktree's top differs from it.
-      const top = r.stdout.replace(/\n$/, ""), repo = common.stdout.replace(/\n$/, "");
-      const [branch, counts] = await Promise.all([
+      const top = r.stdout.replace(/\r?\n$/, ""), repo = common.stdout.replace(/\r?\n$/, "");
+      const [branch, counts, worktrees] = await Promise.all([
         exec("git", ["symbolic-ref", "-q", "HEAD"], { cwd, on }),
         exec("git", ["rev-list", "--left-right", "--count", "HEAD...@{upstream}"], { cwd, on }),
+        exec("git", ["worktree", "list", "--porcelain", "-z"], { cwd, on }),
       ]);
       const name = repo.endsWith("/.git") ? base(repo.slice(0, -5)) : base(repo).replace(/\.git$/, "");
       const [ahead, behind] = counts.code === 0 ? counts.stdout.trim().split(/\s+/).map(Number) : [0, 0];
-      const info = { name, branch: branch.code === 0 ? branch.stdout.trim().replace(/^refs\/heads\//, "") : "(detached)", ahead, behind, repo: JSON.stringify([on, repo]), linked: repo !== `${top}/.git` };
+      const info = { name, branch: branch.code === 0 ? branch.stdout.trim().replace(/^refs\/heads\//, "") : "(detached)", ahead, behind, top, repo: JSON.stringify([on, repo]), linked: pathKey(repo) !== pathKey(gitDir.stdout.replace(/\r?\n$/, "")) };
       this.git[key] = info;
+      if (worktrees.code === 0) this.worktrees.set(info.repo, { checkouts: parseWorktrees(worktrees.stdout), error: null });
+      else this.worktrees.set(info.repo, { checkouts: [], error: worktrees.stderr || "Could not discover worktrees" });
       if (!on) this.watch(repo, cx);
     } catch {
       // Couldn't ask (the machine is away): keep what it showed, look again later.
@@ -297,6 +305,21 @@ export default class Spaces extends View {
   // The rows, under a header per machine once one isn't this computer.
   grouped(t, collapsed) {
     const rows = this.ordered();
+    const owners = new Map();
+    for (const row of rows) {
+      if (!row.g) continue;
+      const previous = owners.get(row.g.repo);
+      if (!previous || (previous.g.linked && !row.g.linked)) owners.set(row.g.repo, row);
+    }
+    const ps = panes();
+    for (const row of rows) {
+      row.discovered = [];
+      if (!row.g || owners.get(row.g.repo) !== row) continue;
+      const snapshot = this.worktrees.get(row.g.repo);
+      row.discoveryError = snapshot?.error;
+      const folders = spaces().filter(space => (space.machine ?? null) === (row.w.machine ?? null)).map(space => place(space, ps));
+      row.discovered = unopenedWorktrees(snapshot?.checkouts ?? [], folders, row.g.top);
+    }
     const draw = (r) => (collapsed ? this.compact(r, t) : this.spaceTree(r, t));
     const remote = [...new Set([...rows.map(r => r.w.machine).filter(Boolean), ...this.machines.map(m => m.name), ...Object.keys(this.reconnecting)])].sort();
     const loading = m => {
@@ -410,8 +433,36 @@ export default class Spaces extends View {
       for (const agent of roots) append(agent, 0);
       // A malformed parent cycle must not hide a live agent.
       for (const agent of list) append(agent, 0);
+      for (const checkout of r.discovered ?? []) root.child(this.worktreeRow(checkout, r, t));
+      if (r.discoveryError) root.child(div().pl(30).py(4).text_size(11).text_color(t.blocked)
+        .tooltip(r.discoveryError).child("Worktree discovery unavailable"));
     }
     return root;
+  }
+
+  worktreeRow(checkout, row, t) {
+    const key = JSON.stringify([row.w.machine, pathKey(checkout.path)]);
+    const name = checkout.branch ?? `Detached ${checkout.head.slice(0, 7)}`;
+    return h_flex().id(`discovered-worktree-${key}`).h(28).flex_none().pl(row.tree ? 52 : 30).pr(8).gap(7)
+      .items_center().rounded(6).cursor_pointer().hover(el => el.bg(t.hover))
+      .tooltip(`${name}\n${checkout.path}\nClick to open this existing worktree${checkout.locked ? " (locked against pruning)" : ""}`)
+      .on_click((_e, cx) => {
+        if (this.openingWorktrees.has(key)) return;
+        const checkouts = this.worktrees.get(row.g.repo)?.checkouts ?? [];
+        const ps = panes();
+        const existing = spaces().find(space => (space.machine ?? null) === (row.w.machine ?? null)
+          && pathKey(checkoutForFolder(checkouts, place(space, ps))?.path) === pathKey(checkout.path));
+        if (existing) { run("space.select", { id: existing.id }); return; }
+        this.openingWorktrees.add(key);
+        try { run("space.new", { folder: checkout.path, machine: row.w.machine ?? "" }); }
+        finally {
+          cx.timer.after(1500, cx => { this.openingWorktrees.delete(key); cx.notify(); });
+          cx.notify();
+        }
+      })
+      .child(svg("mods/workspace-chrome/branch.svg").size(13).flex_none().text_color(t.dim))
+      .child(div().flex_1().min_w(0).truncate().text_size(12).text_color(t.muted).child(name))
+      .child(div().flex_none().text_size(10).text_color(t.dim).child(this.openingWorktrees.has(key) ? "Opening…" : "Open"));
   }
 
   agentRow(agent, depth, worktree, t) {
@@ -486,9 +537,9 @@ export default class Spaces extends View {
         h_flex()
           .gap(9)
           .items_center()
-          .when(this.spaceAgents.some(a => a.space === w.id), el => el.child(
+          .when(this.spaceAgents.some(a => a.space === w.id) || (this.worktrees.get(g?.repo)?.checkouts.length ?? 0) > 1, el => el.child(
             div().id(`tree-toggle-${w.id}`).size(12).flex_none().cursor_pointer()
-              .tooltip("Expand or collapse agents")
+              .tooltip("Expand or collapse agents and discovered worktrees")
               .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
               .on_mouse_up("left", (_e, cx) => cx.stop_propagation())
               .on_click((_e, cx) => {
