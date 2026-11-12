@@ -51,7 +51,7 @@ To return to another layout, use **Ctrl+Shift+L**. Herdr's emergency reset is **
 
 Windows only: uses Windows PowerShell (`powershell.exe -STA`), Windows Forms clipboard access and System.Drawing. It reads clipboard images, writes unique PNGs under `%TEMP%/herdr-pi-images/`, temporarily puts the quoted path on the clipboard for Herdr's native paste, then restores the image if the clipboard still contains that path. Rich clipboard formats are not preserved. Files remain available for Pi's read tool until you or Windows clean up the temp folder; images are not uploaded or automatically submitted. Switching terminal focus while saving cancels the paste. Remote terminals retain native Herdr paste behavior.
 
-The mod is a zero-width service block in `herdr-skillshare`; other layouts do not depend on it. Plain text and copied files fall back to native paste. No Pi extension or shared library changes are needed.
+The mod is a zero-width service block in `herdr-skillshare`; other layouts do not depend on it. Text is detected with Herdr's native `cx.read_from_clipboard()` and pasted immediately, without starting PowerShell. If the clipboard offers both text and an image, text takes priority. Image-only clipboard data uses the PowerShell save/restore path; copied files without text still pass through the image check before falling back to native paste. Remote terminal paste stays native. No Pi extension or shared library changes are needed.
 
 ## Refresh this export
 
@@ -95,7 +95,7 @@ Discovery refreshes at startup, on repository Git-folder changes where supported
 The worktree tests require Node.js and Git, with no npm dependencies:
 
 ```powershell
-node --test tests/worktrees.test.mjs
+node --test tests/*.test.mjs
 ```
 
 Tests cover NUL-delimited paths, detached/locked/prunable and bare records, Windows path matching, machine isolation, duplicate prevention, click actions and a real Git worktree created before discovery, including removal refresh.

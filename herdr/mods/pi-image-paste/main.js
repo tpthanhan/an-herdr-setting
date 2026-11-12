@@ -9,7 +9,9 @@ export default class PiImagePaste extends View {
         if (command !== "paste") continue;
         const terminal = focused()?.terminal;
         if (!terminal) continue;
-        if (terminal.includes("/")) {
+        // Stay on Herdr's native path for text (including empty text). Starting
+        // PowerShell just to discover there is no image adds latency to every paste.
+        if (terminal.includes("/") || typeof cx.read_from_clipboard() === "string") {
           run("terminal.paste");
           continue;
         }
